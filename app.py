@@ -28,7 +28,7 @@ st.markdown("---")
 
 # Sidebar
 st.sidebar.header("Input Method")
-option = st.sidebar.radio("Choose how to input data:", ["Upload CSV File", "Manual Sensor Input"])
+option = st.sidebar.radio("Choose how to input data:", ["Manual Sensor Input", "Upload CSV File"])
 
 # Health status function
 def get_health_status(rul):
@@ -39,69 +39,43 @@ def get_health_status(rul):
     else:
         return "Critical", "red", "🚨 Immediate maintenance required"
 
-# ===================== OPTION 1: CSV UPLOAD =====================
-if option == "Upload CSV File":
-    st.subheader("📁 Upload Sensor Data (CSV)")
-    st.info("Your CSV file must contain the same sensor columns that were used during training.")
+# Realistic default values (based on NASA C-MAPSS typical ranges)
+default_values = {
+    "setting1": 0.0020,
+    "setting2": 0.0000,
+    "s2": 643.0,
+    "s3": 1589.0,
+    "s4": 1407.0,
+    "s6": 21.60,
+    "s7": 553.0,
+    "s8": 2388.0,
+    "s9": 9050.0,
+    "s11": 47.30,
+    "s12": 522.0,
+    "s13": 2388.0,
+    "s14": 8130.0,
+    "s15": 8.42,
+    "s17": 392.0,
+    "s20": 38.90,
+    "s21": 23.30
+}
 
-    uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
-
-    if uploaded_file is not None:
-        try:
-            df = pd.read_csv(uploaded_file)
-            st.write("### Preview of uploaded data:")
-            st.dataframe(df.head())
-
-            # Check if required columns exist
-            missing_cols = [col for col in features if col not in df.columns]
-            if missing_cols:
-                st.error(f"Missing columns in your CSV: {missing_cols}")
-            else:
-                # Select only required features
-                X = df[features]
-                X_scaled = scaler.transform(X)
-                predictions = model.predict(X_scaled)
-
-                result_df = df.copy()
-                result_df["Predicted_RUL"] = predictions.round(2)
-
-                # Add health status
-                health_list = []
-                for rul in predictions:
-                    status, _, _ = get_health_status(rul)
-                    health_list.append(status)
-                result_df["Health_Status"] = health_list
-
-                st.success("✅ Predictions completed successfully!")
-                st.write("### Prediction Results:")
-                st.dataframe(result_df)
-
-                # Download button
-                csv = result_df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Download Predictions as CSV",
-                    data=csv,
-                    file_name="rul_predictions.csv",
-                    mime="text/csv"
-                )
-
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
-
-# ===================== OPTION 2: MANUAL INPUT =====================
-else:
+# ===================== OPTION 1: MANUAL INPUT =====================
+if option == "Manual Sensor Input":
     st.subheader("✍️ Manual Sensor Input")
-    st.write("Enter the sensor values below:")
+    st.write("Enter the sensor values below (realistic example values are pre-filled):")
 
     input_data = {}
     cols = st.columns(3)
 
     for i, feature in enumerate(features):
         with cols[i % 3]:
+            default = default_values.get(feature, 0.0)
             input_data[feature] = st.number_input(
                 label=feature,
-                value=0.0,
-                format="%.4f"
+                value=float(default),
+                format="%.4f",
+                key=feature
             )
 
     if st.button("Predict RUL", type="primary"):
@@ -142,6 +116,51 @@ else:
 
         except Exception as e:
             st.error(f"Prediction failed: {e}")
+
+# ===================== OPTION 2: CSV UPLOAD =====================
+else:
+    st.subheader("📁 Upload Sensor Data (CSV)")
+    st.info("Your CSV file must contain the same sensor columns that were used during training.")
+
+    uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
+
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.write("### Preview of uploaded data:")
+            st.dataframe(df.head())
+
+            missing_cols = [col for col in features if col not in df.columns]
+            if missing_cols:
+                st.error(f"Missing columns in your CSV: {missing_cols}")
+            else:
+                X = df[features]
+                X_scaled = scaler.transform(X)
+                predictions = model.predict(X_scaled)
+
+                result_df = df.copy()
+                result_df["Predicted_RUL"] = predictions.round(2)
+
+                health_list = []
+                for rul in predictions:
+                    status, _, _ = get_health_status(rul)
+                    health_list.append(status)
+                result_df["Health_Status"] = health_list
+
+                st.success("✅ Predictions completed successfully!")
+                st.write("### Prediction Results:")
+                st.dataframe(result_df)
+
+                csv = result_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download Predictions as CSV",
+                    data=csv,
+                    file_name="rul_predictions.csv",
+                    mime="text/csv"
+                )
+
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
 
 # Footer
 st.markdown("---")
